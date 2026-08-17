@@ -1,17 +1,27 @@
+import os
+import torch
+
 class Config:
-    # 直接使用相對路徑往上一層抓資料
-    train_dir = "../ISIC_2019_Training_Dataset_new"
-    val_dir = "../ISIC_2019_Vaild_Dataset"
-    test_dir = "../ISIC_2019_Test_Dataset"
-    test_csv = "../ISIC_2019_Test_GroundTruth.csv"
+    # --- 路徑設定 ---
+    # 假設目前位於 model 資料夾內，資料夾位於上一層 (../)
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    TRAIN_CSV_PATH = os.path.join(BASE_DIR, "..", "ISIC_2019_Training_GroundTruth.csv")
+    IMAGE_DIR = os.path.join(BASE_DIR, "..", "ISIC_2019_Training_Dataset_new")
+    OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
+    WEIGHT_SAVE_PATH = os.path.join(OUTPUT_DIR, "best_swin_model.pth")
     
-    # 權重檔存放在當前 model 資料夾內
-    save_model_path = "best_model.pth"
+    # --- 模型超參數 ---
+    MODEL_NAME = "swin_tiny_patch4_window7_224"  # 使用 timm 預訓練模型
+    NUM_CLASSES = 9                              # ISIC 2019 共有 9 類病灶
+    IMAGE_SIZE = 224
     
-    # 其他訓練參數
-    img_size = (224, 224)
-    batch_size = 32
-    num_classes = 9
-    epochs = 20
-    learning_rate = 1e-4
-    device = "cuda"
+    # --- 訓練超參數 ---
+    BATCH_SIZE = 32
+    NUM_WORKERS = 4
+    EPOCHS = 20
+    LEARNING_RATE = 1e-4
+    WEIGHT_DECAY = 1e-2
+    SEED = 42
+    
+    # --- 硬體設定 ---
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
