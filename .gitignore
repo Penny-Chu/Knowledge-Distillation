@@ -1,0 +1,7 @@
+# 忽略個人筆記
+UploadSteps*
+
+# 忽略 Python 快取與模型權重 (建議一併加入)
+__pycache__/
+*.pth
+*.pt
