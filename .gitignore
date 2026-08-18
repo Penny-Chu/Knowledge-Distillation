@@ -2,8 +2,19 @@
 UploadSteps*
 Code Function*
 ~$*.docx
+*.docx
 
-# 忽略 Python 快取與模型權重 (建議一併加入)
+# 忽略快取與虛擬環境
 __pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# 忽略訓練產出的模型權重檔
 *.pth
 *.pt
+*.ckpt
+
+# 忽略個人筆記與系統檔
+上傳步驟*
+.DS_Store
+Thumbs.db
