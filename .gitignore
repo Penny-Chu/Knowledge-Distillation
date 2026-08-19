@@ -17,4 +17,7 @@ __pycache__/
 # 忽略個人筆記與系統檔
 上傳步驟*
 .DS_Store
-Thumbs.db
+Thumbs.db1
+
+# 忽略 VS Code 編輯器個人設定
+.vscode/
