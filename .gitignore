@@ -1,4 +1,4 @@
-# 忽略個人筆記
+# 忽略個人筆記與暫存文件
 UploadSteps*
 Code Function*
 ~$*.docx
@@ -13,11 +13,17 @@ __pycache__/
 *.pth
 *.pt
 *.ckpt
+*.safetensors
+*.bin
 
-# 忽略個人筆記與系統檔
-上傳步驟*
+# 排除權重輸出資料夾
+outputs/
+model/outputs/
+
+# 忽略系統檔
 .DS_Store
-Thumbs.db1
+Thumbs.db
+Thumbs.db*
 
 # 忽略 VS Code 編輯器個人設定
 .vscode/
