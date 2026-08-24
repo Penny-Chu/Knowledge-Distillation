@@ -1,4 +1,5 @@
 import os
+import glob
 import pandas as pd
 from PIL import Image
 import torch
@@ -11,7 +12,7 @@ class SkinDataset(Dataset):
         self.img_dir = img_dir
         self.transform = transform
         
-        # 取得標籤欄位 (排除 image 欄位)
+        # 取得標籤欄位 (排除 image)
         self.label_cols = [col for col in df.columns if col != 'image']
 
     def __len__(self):
@@ -34,7 +35,6 @@ class SkinDataset(Dataset):
         return image, torch.tensor(label, dtype=torch.long)
 
 def get_transforms(img_size=224):
-    # 訓練集資料增強
     train_transform = transforms.Compose([
         transforms.Resize((img_size, img_size)),
         transforms.RandomHorizontalFlip(),
@@ -46,7 +46,6 @@ def get_transforms(img_size=224):
                              std=[0.229, 0.224, 0.225])
     ])
     
-    # 驗證/測試集轉換
     val_transform = transforms.Compose([
         transforms.Resize((img_size, img_size)),
         transforms.ToTensor(),
@@ -57,13 +56,11 @@ def get_transforms(img_size=224):
     return train_transform, val_transform
 
 def prepare_dataloaders(train_csv_path, val_csv_path, train_img_dir, val_img_dir, batch_size=32, num_workers=4):
-    # 分別讀取訓練與驗證的 CSV
     train_df = pd.read_csv(train_csv_path)
     val_df = pd.read_csv(val_csv_path)
     
     train_transform, val_transform = get_transforms()
     
-    # 將各自獨立的圖片目錄傳入 Dataset
     train_dataset = SkinDataset(train_df, train_img_dir, transform=train_transform)
     val_dataset = SkinDataset(val_df, val_img_dir, transform=val_transform)
     
