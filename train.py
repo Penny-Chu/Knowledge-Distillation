@@ -9,28 +9,26 @@ from model import SkinCancerModel
 from trainer import Trainer
 
 def main():
-    # 建立資料載入器
+    # 傳入獨立的 CSV 路徑與各自的圖片資料夾路徑
     train_loader, val_loader = prepare_dataloaders(
-        csv_path=Config.TRAIN_CSV_PATH,
-        img_dir=Config.IMAGE_DIR,
+        train_csv_path=Config.TRAIN_CSV_PATH,
+        val_csv_path=Config.VAL_CSV_PATH,
+        train_img_dir=Config.TRAIN_IMAGE_DIR,
+        val_img_dir=Config.VAL_IMAGE_DIR,
         batch_size=Config.BATCH_SIZE,
-        num_workers=Config.NUM_WORKERS,
-        seed=Config.SEED
+        num_workers=Config.NUM_WORKERS
     )
     
-    # 建立模型
     model = SkinCancerModel(
         model_name=Config.MODEL_NAME,
         num_classes=Config.NUM_CLASSES,
         pretrained=True
     ).to(Config.DEVICE)
     
-    # 定義 Loss 函數與優化器
     criterion = nn.CrossEntropyLoss()
     optimizer = AdamW(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=Config.WEIGHT_DECAY)
     scheduler = CosineAnnealingLR(optimizer, T_max=Config.EPOCHS)
     
-    # 啟動訓練器
     trainer = Trainer(
         model=model,
         train_loader=train_loader,

@@ -4,7 +4,6 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
-from sklearn.model_selection import train_test_split
 
 class SkinDataset(Dataset):
     def __init__(self, df, img_dir, transform=None):
@@ -22,11 +21,11 @@ class SkinDataset(Dataset):
         row = self.df.iloc[idx]
         img_name = row['image']
         
-        # 讀取圖片 (ISIC 2019 圖片通常為 .jpg)
+        # 讀取對應資料夾中的圖片
         img_path = os.path.join(self.img_dir, f"{img_name}.jpg")
         image = Image.open(img_path).convert("RGB")
         
-        # 取得類別標籤 (One-Hot 轉整數類別索引)
+        # 取得類別標籤 (One-Hot 轉整數索引)
         label = row[self.label_cols].values.argmax()
         
         if self.transform:
@@ -35,7 +34,7 @@ class SkinDataset(Dataset):
         return image, torch.tensor(label, dtype=torch.long)
 
 def get_transforms(img_size=224):
-    # 訓練集增強 (Data Augmentation)
+    # 訓練集資料增強
     train_transform = transforms.Compose([
         transforms.Resize((img_size, img_size)),
         transforms.RandomHorizontalFlip(),
@@ -47,7 +46,7 @@ def get_transforms(img_size=224):
                              std=[0.229, 0.224, 0.225])
     ])
     
-    # 驗證集轉換 (不進行隨機增強)
+    # 驗證/測試集轉換
     val_transform = transforms.Compose([
         transforms.Resize((img_size, img_size)),
         transforms.ToTensor(),
@@ -57,16 +56,16 @@ def get_transforms(img_size=224):
     
     return train_transform, val_transform
 
-def prepare_dataloaders(csv_path, img_dir, batch_size=32, num_workers=4, seed=42):
-    df = pd.read_csv(csv_path)
-    
-    # 分割訓練集與驗證集 (8:2 分割)
-    train_df, val_df = train_test_split(df, test_size=0.2, random_state=seed, shuffle=True)
+def prepare_dataloaders(train_csv_path, val_csv_path, train_img_dir, val_img_dir, batch_size=32, num_workers=4):
+    # 分別讀取訓練與驗證的 CSV
+    train_df = pd.read_csv(train_csv_path)
+    val_df = pd.read_csv(val_csv_path)
     
     train_transform, val_transform = get_transforms()
     
-    train_dataset = SkinDataset(train_df, img_dir, transform=train_transform)
-    val_dataset = SkinDataset(val_df, img_dir, transform=val_transform)
+    # 將各自獨立的圖片目錄傳入 Dataset
+    train_dataset = SkinDataset(train_df, train_img_dir, transform=train_transform)
+    val_dataset = SkinDataset(val_df, val_img_dir, transform=val_transform)
     
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True

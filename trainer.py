@@ -61,7 +61,7 @@ class Trainer:
         epoch_loss = running_loss / total
         epoch_acc = correct / total
         
-        # 儲存最佳驗證集準確率的模型權重
+        # 儲存最佳模型權重
         if epoch_acc > self.best_val_acc:
             self.best_val_acc = epoch_acc
             os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
