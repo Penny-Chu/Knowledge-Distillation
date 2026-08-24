@@ -27,7 +27,7 @@ class Config:
     # --- 訓練超參數 ---
     BATCH_SIZE = 32
     NUM_WORKERS = 4
-    EPOCHS = 20
+    EPOCHS = 30
     LEARNING_RATE = 1e-4
     WEIGHT_DECAY = 1e-2
     SEED = 42

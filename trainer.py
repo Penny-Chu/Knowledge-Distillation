@@ -3,7 +3,7 @@ import torch
 from tqdm import tqdm
 
 class Trainer:
-    def __init__(self, model, train_loader, val_loader, criterion, optimizer, scheduler, device, save_path):
+    def __init__(self, model, train_loader, val_loader, criterion, optimizer, scheduler, device, save_path, patience=7):
         self.model = model
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -12,7 +12,12 @@ class Trainer:
         self.scheduler = scheduler
         self.device = device
         self.save_path = save_path
+        
+        # 指標紀錄與早停參數
+        self.best_val_loss = float('inf')
         self.best_val_acc = 0.0
+        self.patience = patience          # 容忍 Val Loss 沒下降的最大輪數
+        self.patience_counter = 0        # 目前累計未改善的輪數
 
     def train_one_epoch(self, epoch):
         self.model.train()
@@ -61,12 +66,18 @@ class Trainer:
         epoch_loss = running_loss / total
         epoch_acc = correct / total
         
-        # 儲存最佳模型權重
-        if epoch_acc > self.best_val_acc:
+        # 根據 Val Loss 判定是否儲存最佳模型與更新早停計數器
+        if epoch_loss < self.best_val_loss:
+            self.best_val_loss = epoch_loss
             self.best_val_acc = epoch_acc
+            self.patience_counter = 0  # 表現進步，計數器重置為 0
+            
             os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
             torch.save(self.model.state_dict(), self.save_path)
-            print(f"--> Saved New Best Model (Val Acc: {self.best_val_acc:.4f})")
+            print(f"--> Saved New Best Model (Val Loss: {self.best_val_loss:.4f} | Val Acc: {self.best_val_acc:.4f})")
+        else:
+            self.patience_counter += 1  # 表現未改善，累計計數器
+            print(f"--> EarlyStopping counter: {self.patience_counter}/{self.patience}")
             
         return epoch_loss, epoch_acc
 
@@ -81,3 +92,8 @@ class Trainer:
             print(f"Epoch {epoch:02d}/{epochs:02d} | "
                   f"Train Loss: {train_loss:.4f} Acc: {train_acc:.4f} | "
                   f"Val Loss: {val_loss:.4f} Acc: {val_acc:.4f}")
+            
+            # 檢查是否達到早停標準
+            if self.patience_counter >= self.patience:
+                print(f"\n[Early Stopping] 驗證集 Loss 連續 {self.patience} 輪未下降，提前終止訓練！")
+                break
