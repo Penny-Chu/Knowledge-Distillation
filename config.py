@@ -17,18 +17,18 @@ class Config:
     
     # --- 權重輸出路徑 ---
     OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
-    WEIGHT_SAVE_PATH = os.path.join(OUTPUT_DIR, "best_swin_model.pth")
+    WEIGHT_SAVE_PATH = os.path.join(OUTPUT_DIR, "best_swin_transformer_base_model.pth")
     
     # --- 模型超參數 ---
     MODEL_NAME = "swin_base_patch4_window7_224.ms_in22k_ft_in1k"  # 使用 timm 預訓練模型
-    NUM_CLASSES = 9                              # ISIC 2019 共有 9 類病灶
+    NUM_CLASSES = 8                        # ISIC 2019 共有 8 類病灶
     IMAGE_SIZE = 224
     
     # --- 訓練超參數 ---
     BATCH_SIZE = 32
     NUM_WORKERS = 4
-    EPOCHS = 30
-    LEARNING_RATE = 1e-4
+    EPOCHS = 100
+    LEARNING_RATE = 3e-5
     WEIGHT_DECAY = 1e-2
     SEED = 42
     
