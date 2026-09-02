@@ -3,7 +3,7 @@ import torch.nn as nn
 import timm
 
 class SkinCancerModel(nn.Module):
-    def __init__(self, model_name="swin_tiny_patch4_window7_224.ms_in22k_ft_in1k", num_classes=9, pretrained=True):
+    def __init__(self, model_name, num_classes, pretrained=True):
         super(SkinCancerModel, self).__init__()
         # 載入 timm Swin Transformer 預訓練模型
         self.model = timm.create_model(model_name, pretrained=pretrained, num_classes=num_classes)
