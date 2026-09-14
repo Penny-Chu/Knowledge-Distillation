@@ -27,7 +27,8 @@ from config import Config
 from model import SkinCancerModel
 from dataset import SkinDataset, get_transforms
 
-def reshape_transform(tensor, height=7, width=7):
+# Swin-384 下採樣 32 倍後特徵圖寬高為 12x12
+def reshape_transform(tensor, height=12, width=12):
     if len(tensor.shape) == 4:
         result = tensor.permute(0, 3, 1, 2)
     elif len(tensor.shape) == 3:
@@ -37,7 +38,7 @@ def reshape_transform(tensor, height=7, width=7):
         result = tensor
     return result
 
-def run_evaluation_and_gradcam(unk_threshold):
+def run_evaluation_and_gradcam(unk_threshold=0.6):
     device = torch.device(Config.DEVICE if torch.cuda.is_available() else "cpu")
     print(f"--> Using device: {device}")
 
@@ -149,7 +150,8 @@ def run_evaluation_and_gradcam(unk_threshold):
         if not os.path.exists(img_path):
             img_path = os.path.join(Config.TEST_IMAGE_DIR, img_name)
             
-        pil_img = Image.open(img_path).convert("RGB").resize((224, 224))
+        # 將寫死的 224 改為動態讀取 Config.IMAGE_SIZE (384)
+        pil_img = Image.open(img_path).convert("RGB").resize((Config.IMAGE_SIZE, Config.IMAGE_SIZE))
         rgb_img = np.float32(pil_img) / 255.0
 
         input_tensor, _ = test_dataset[i]

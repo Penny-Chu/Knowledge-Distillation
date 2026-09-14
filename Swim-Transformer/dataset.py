@@ -6,6 +6,9 @@ import torch
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from torchvision import transforms
 
+# 引入 Config 以取得預設 IMAGE_SIZE
+from config import Config
+
 class SkinDataset(Dataset):
     def __init__(self, df, img_dir, transform=None):
         self.df = df
@@ -38,7 +41,8 @@ class SkinDataset(Dataset):
             
         return image, torch.tensor(label, dtype=torch.long)
 
-def get_transforms(img_size):
+# 直接以 Config.IMAGE_SIZE 作為預設值，防呆且無須手動傳參
+def get_transforms(img_size=Config.IMAGE_SIZE):
     train_transform = transforms.Compose([
         transforms.Resize((img_size, img_size)),
         transforms.RandomHorizontalFlip(p=0.5),
@@ -59,7 +63,8 @@ def get_transforms(img_size):
     
     return train_transform, val_transform
 
-def prepare_dataloaders(train_csv_path, val_csv_path, train_img_dir, val_img_dir, batch_size, num_workers, img_size=224):
+# img_size 同樣預設吃 Config.IMAGE_SIZE
+def prepare_dataloaders(train_csv_path, val_csv_path, train_img_dir, val_img_dir, batch_size, num_workers, img_size=Config.IMAGE_SIZE):
     train_df = pd.read_csv(train_csv_path)
     val_df = pd.read_csv(val_csv_path)
     
