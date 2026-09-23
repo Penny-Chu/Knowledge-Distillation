@@ -15,13 +15,12 @@ class SkinDataset(Dataset):
         self.img_dir = img_dir
         self.transform = transform
         
-        # 提取圖片檔名陣列
         self.image_names = df['image'].values
         
-        # 取得標準 8 類標籤欄位 (排除 image 與 UNK)
-        self.label_cols = [col for col in df.columns if col not in ['image', 'UNK']]
+        # 不要動態抓欄位，直接使用 Config 定義的標準順序
+        self.label_cols = Config.CLASS_NAMES
         
-        # 預先計算好所有標籤索引 (避免在 __getitem__ 內使用 iloc 造成 CPU 負擔)
+        # 強制只取這 8 個欄位，並且確保順序與 Config.CLASS_NAMES 完全相同
         self.labels = df[self.label_cols].values.argmax(axis=1)
 
     def __len__(self):
@@ -47,7 +46,6 @@ def get_transforms(img_size=Config.IMAGE_SIZE):
         transforms.Resize((img_size, img_size)),
         transforms.RandomHorizontalFlip(p=0.5),
         transforms.RandomVerticalFlip(p=0.5),
-        transforms.RandomRotation(90),
         transforms.ColorJitter(brightness=0.1, contrast=0.1),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], 
@@ -79,38 +77,16 @@ def prepare_dataloaders(train_csv_path, val_csv_path, train_img_dir, val_img_dir
     train_dataset = SkinDataset(train_df, train_img_dir, transform=train_transform)
     val_dataset = SkinDataset(val_df, val_img_dir, transform=val_transform)
     
-    # ---------------- 建立 Balanced Sampler (平衡取樣器) ----------------
-    # 1. 取得訓練集中每個樣本的類別標籤索引
-    train_targets = train_dataset.labels
-    
-    # 2. 計算各類別的樣本總數
-    class_counts = np.bincount(train_targets)
-    
-    # 3. 計算各類別權重 (樣本數倒數，避免除以 0 加上 epsilon)
-    class_weights = 1.0 / (class_counts + 1e-5)
-    
-    # 4. 將類別權重指派給每一個獨立樣本
-    sample_weights = class_weights[train_targets]
-    sample_weights = torch.from_numpy(sample_weights).float()
-    
-    # 5. 建立 WeightedRandomSampler (replacement 必須為 True 允許重複抽取少數類)
-    sampler = WeightedRandomSampler(
-        weights=sample_weights,
-        num_samples=len(sample_weights),
-        replacement=True
-    )
-    
-    # 訓練集使用 sampler 時，shuffle 必須設為 False
+    # 訓練集改回標準隨機抽樣 (shuffle=True)
     train_loader = DataLoader(
         train_dataset, 
         batch_size=batch_size, 
-        sampler=sampler, 
-        shuffle=False, 
+        shuffle=True, 
         num_workers=num_workers, 
         pin_memory=True
     )
     
-    # 驗證集維持標準循序讀取，反映真實分佈
+    # 驗證集維持循序讀取 (shuffle=False)
     val_loader = DataLoader(
         val_dataset, 
         batch_size=batch_size, 

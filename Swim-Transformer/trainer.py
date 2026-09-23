@@ -1,6 +1,7 @@
 import os
 import torch
 import numpy as np
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 from sklearn.metrics import balanced_accuracy_score
 
@@ -14,6 +15,15 @@ class Trainer:
         self.scheduler = scheduler
         self.device = device
         self.save_path = os.path.abspath(os.path.normpath(save_path))
+        
+        # 紀錄訓練與驗證的完整歷史數據
+        self.history = {
+            'train_loss': [],
+            'val_loss': [],
+            'train_acc': [],
+            'val_acc': [],
+            'val_bacc': []
+        }
         
         # 改以 Balanced Accuracy 為監控指標（越高越好，初始為 0.0）
         self.best_val_bacc = 0.0
@@ -92,10 +102,49 @@ class Trainer:
             
         return epoch_loss, epoch_acc, val_bacc
 
+    def plot_training_curves(self):
+        # 繪製訓練與驗證的 Loss、Accuracy 曲線
+        epochs_range = range(1, len(self.history['train_loss']) + 1)
+        output_dir = os.path.dirname(self.save_path)
+        
+        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+        
+        # 1. Loss 曲線 (Train vs Val)
+        axes[0].plot(epochs_range, self.history['train_loss'], label='Train Loss', color='royalblue', linewidth=2)
+        axes[0].plot(epochs_range, self.history['val_loss'], label='Val Loss', color='darkorange', linewidth=2)
+        axes[0].set_title('Loss vs Epochs')
+        axes[0].set_xlabel('Epoch')
+        axes[0].set_ylabel('Loss')
+        axes[0].legend()
+        axes[0].grid(True, alpha=0.3)
+        
+        # 2. Accuracy 曲線 (Train Acc vs Val Acc vs Val Balanced Acc)
+        axes[1].plot(epochs_range, self.history['train_acc'], label='Train Acc', color='royalblue', linewidth=2)
+        axes[1].plot(epochs_range, self.history['val_acc'], label='Val Acc', color='darkorange', linewidth=2)
+        axes[1].plot(epochs_range, self.history['val_bacc'], label='Val Balanced Acc', color='seagreen', linestyle='--', linewidth=2)
+        axes[1].set_title('Accuracy vs Epochs')
+        axes[1].set_xlabel('Epoch')
+        axes[1].set_ylabel('Accuracy')
+        axes[1].legend()
+        axes[1].grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        curve_save_path = os.path.join(output_dir, "training_validation_curves.png")
+        plt.savefig(curve_save_path, dpi=300)
+        plt.close()
+        print(f"--> Training and validation curves saved to: {curve_save_path}")
+
     def fit(self, epochs):
         for epoch in range(1, epochs + 1):
             train_loss, train_acc = self.train_one_epoch(epoch)
             val_loss, val_acc, val_bacc = self.validate(epoch)
+            
+            # 存入本輪指標
+            self.history['train_loss'].append(train_loss)
+            self.history['val_loss'].append(val_loss)
+            self.history['train_acc'].append(train_acc)
+            self.history['val_acc'].append(val_acc)
+            self.history['val_bacc'].append(val_bacc)
             
             if self.scheduler:
                 self.scheduler.step()
@@ -108,3 +157,6 @@ class Trainer:
             if self.patience_counter >= self.patience:
                 print(f"\n[Early Stopping] 驗證集 Balanced Accuracy 連續 {self.patience} 輪未提升，提前終止訓練！")
                 break
+                
+        # 訓練完成或觸發早停時輸出折線圖
+        self.plot_training_curves()

@@ -34,14 +34,22 @@ def main():
     # 根據訓練集各類別樣本數計算反比權重 (Class Weights)
     train_df = pd.read_csv(Config.TRAIN_CSV_PATH)
     # 確保類別名稱排除 UNK
-    class_names = [col for col in train_df.columns if col not in ['image', 'UNK']]
+    class_names = Config.CLASS_NAMES
     class_counts = train_df[class_names].sum().values
-    class_weights = 1.0 / np.sqrt(class_counts + 1e-5)
-    class_weights = class_weights / class_weights.sum() * len(class_names)
-    class_weights = torch.tensor(class_weights, dtype=torch.float).to(Config.DEVICE)
+    # 1. 計算總樣本數與類別總數
+    total_samples = np.sum(class_counts)
+    num_classes = len(class_names)
+
+    # 將 53 倍的差距壓縮到合理的倍數範圍
+    class_weights_np = total_samples / (num_classes * np.sqrt(class_counts + 1e-5))
+# 歸一化，維持 Loss 尺度穩定
+    class_weights_np = class_weights_np / class_weights_np.sum() * num_classes
+
+    # 3. 轉成 PyTorch FloatTensor 並傳送至指定的裝置 (GPU/CPU)
+    class_weights = torch.tensor(class_weights_np, dtype=torch.float).to(Config.DEVICE)
     
     # 使用加權損失函數以處理類別不平衡
-    criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=0.1)
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = AdamW(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=Config.WEIGHT_DECAY)
     scheduler = CosineAnnealingLR(optimizer, T_max=Config.EPOCHS)
     

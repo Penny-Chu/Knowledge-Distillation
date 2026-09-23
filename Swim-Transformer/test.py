@@ -28,7 +28,7 @@ from model import SkinCancerModel
 from dataset import SkinDataset, get_transforms
 
 # Swin-384 下採樣 32 倍後特徵圖寬高為 12x12
-def reshape_transform(tensor, height=12, width=12):
+def reshape_transform(tensor, height=7, width=7):
     if len(tensor.shape) == 4:
         result = tensor.permute(0, 3, 1, 2)
     elif len(tensor.shape) == 3:
@@ -38,7 +38,7 @@ def reshape_transform(tensor, height=12, width=12):
         result = tensor
     return result
 
-def run_evaluation_and_gradcam(unk_threshold=0.6):
+def run_evaluation_and_gradcam():
     device = torch.device(Config.DEVICE if torch.cuda.is_available() else "cpu")
     print(f"--> Using device: {device}")
 
@@ -49,17 +49,19 @@ def run_evaluation_and_gradcam(unk_threshold=0.6):
     _, val_transform = get_transforms()
     test_df = pd.read_csv(Config.TEST_CSV_PATH)
     
-    # 1. 定義 8 類已知病灶與包含 UNK 的 9 類標籤名稱
-    known_classes = ['MEL', 'NV', 'BCC', 'AK', 'BKL', 'DF', 'VASC', 'SCC']
-    has_unk = 'UNK' in test_df.columns
-    class_names = known_classes + ['UNK'] if has_unk else known_classes
+    # 1. 若存在 UNK 欄位，過濾掉 UNK 樣本並移除該欄位，維持標準 8 類
+    if 'UNK' in test_df.columns:
+        test_df = test_df[test_df['UNK'] == 0].reset_index(drop=True)
+        test_df = test_df.drop(columns=['UNK'])
+        
+    class_names = Config.CLASS_NAMES
     n_classes = len(class_names)
     
     test_dataset = SkinDataset(test_df, Config.TEST_IMAGE_DIR, transform=val_transform)
     test_loader = torch.utils.data.DataLoader(
         test_dataset, batch_size=Config.BATCH_SIZE, shuffle=False, num_workers=Config.NUM_WORKERS
     )
-    print(f"--> Loaded {len(test_dataset)} test samples across {n_classes} classes (Included UNK evaluation).")
+    print(f"--> Loaded {len(test_dataset)} test samples across {n_classes} classes.")
 
     # 2. 載入模型權重
     model = SkinCancerModel(model_name=Config.MODEL_NAME, num_classes=Config.NUM_CLASSES, pretrained=False).to(device)
@@ -74,19 +76,14 @@ def run_evaluation_and_gradcam(unk_threshold=0.6):
     all_labels = []
     all_probs = []
 
-    # 3. 執行推論與信心門檻判定
+    # 3. 執行推論（標準 Argmax，不使用 UNK 門檻）
     with torch.no_grad():
         for images, labels in tqdm(test_loader, desc="Testing & Inference"):
             images = images.to(device)
             outputs = model(images)
             
-            # 計算 8 類的 Softmax 機率
             probs = torch.softmax(outputs, dim=1)
-            max_probs, preds = torch.max(probs, 1)
-
-            # 信心門檻判定：最高機率 < unk_threshold 者歸為第 9 類 UNK (索引 8)
-            if has_unk:
-                preds = torch.where(max_probs < unk_threshold, torch.tensor(8, device=device), preds)
+            _, preds = torch.max(outputs, 1)
 
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.numpy())
@@ -96,36 +93,41 @@ def run_evaluation_and_gradcam(unk_threshold=0.6):
     all_labels = np.array(all_labels)
     all_probs = np.array(all_probs)
 
-    # 4. 計算綜合指標
+    # 4. 計算綜合評估指標
     acc = accuracy_score(all_labels, all_preds)
     bacc = balanced_accuracy_score(all_labels, all_preds)
     precision = precision_score(all_labels, all_preds, average='macro', zero_division=0)
     recall = recall_score(all_labels, all_preds, average='macro', zero_division=0)
     f1 = f1_score(all_labels, all_preds, average='macro', zero_division=0)
 
+    try:
+        macro_auc = roc_auc_score(all_labels, all_probs, multi_class='ovr', average='macro')
+    except ValueError:
+        macro_auc = float('nan')
+
     print("\n" + "=" * 55)
-    print("           ISIC 2019 測試集綜合評估指標 (含 UNK 開集)           ")
+    print("           ISIC 2019 測試集綜合評估指標 (標準 8 類)           ")
     print("=" * 55)
     print(f"  * Accuracy (總體準確率)        : {acc:.4f}")
     print(f"  * Balanced Accuracy (平衡準確率): {bacc:.4f}")
     print(f"  * Precision (Macro 精確率)      : {precision:.4f}")
     print(f"  * Recall (Macro 召回率)         : {recall:.4f}")
     print(f"  * F1-Score (Macro F1分數)       : {f1:.4f}")
-    print(f"  * UNK 判斷信心門檻 (Threshold)  : {unk_threshold}")
+    print(f"  * ROC-AUC (Macro One-vs-Rest)  : {macro_auc:.4f}")
     print("=" * 55)
 
     print("\n[Classification Report]")
     print(classification_report(all_labels, all_preds, target_names=class_names, digits=4, zero_division=0))
 
-    # 5. 繪製混淆矩陣
+    # 5. 繪製並儲存混淆矩陣
     cm = confusion_matrix(all_labels, all_preds)
     plt.figure(figsize=(10, 8))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
-    plt.title(f'Confusion Matrix (with UNK, Thresh={unk_threshold})')
+    plt.title('Confusion Matrix - ISIC 2019')
     plt.xlabel('Predicted Label')
     plt.ylabel('True Label')
     plt.tight_layout()
-    cm_save_path = os.path.join(eval_output_dir, "confusion_matrix_unk.png")
+    cm_save_path = os.path.join(eval_output_dir, "confusion_matrix.png")
     plt.savefig(cm_save_path, dpi=300)
     plt.close()
     print(f"--> Confusion matrix saved to: {cm_save_path}")
@@ -150,7 +152,6 @@ def run_evaluation_and_gradcam(unk_threshold=0.6):
         if not os.path.exists(img_path):
             img_path = os.path.join(Config.TEST_IMAGE_DIR, img_name)
             
-        # 將寫死的 224 改為動態讀取 Config.IMAGE_SIZE (384)
         pil_img = Image.open(img_path).convert("RGB").resize((Config.IMAGE_SIZE, Config.IMAGE_SIZE))
         rgb_img = np.float32(pil_img) / 255.0
 
@@ -162,14 +163,7 @@ def run_evaluation_and_gradcam(unk_threshold=0.6):
         visualization = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
 
         pred_label_idx = all_preds[i]
-        pred_title = class_names[pred_label_idx]
-        
-        if pred_label_idx < 8:
-            pred_prob = all_probs[i][pred_label_idx]
-            display_title = f"{pred_title} ({pred_prob:.2f})"
-        else:
-            max_p = np.max(all_probs[i])
-            display_title = f"UNK (Max Conf: {max_p:.2f} < {unk_threshold})"
+        pred_prob = all_probs[i][pred_label_idx]
 
         fig, axes = plt.subplots(1, 3, figsize=(12, 4))
         axes[0].imshow(rgb_img)
@@ -181,7 +175,7 @@ def run_evaluation_and_gradcam(unk_threshold=0.6):
         axes[1].axis('off')
 
         axes[2].imshow(visualization)
-        axes[2].set_title(f"Overlay\nPred: {display_title}")
+        axes[2].set_title(f"Overlay\nPred: {class_names[pred_label_idx]} ({pred_prob:.2f})")
         axes[2].axis('off')
 
         plt.tight_layout()
@@ -193,4 +187,4 @@ def run_evaluation_and_gradcam(unk_threshold=0.6):
     print("\n✅ All evaluations and visualizations completed successfully!")
 
 if __name__ == "__main__":
-    run_evaluation_and_gradcam(unk_threshold=0.6)
+    run_evaluation_and_gradcam()
